@@ -1,8 +1,8 @@
 import os
 from django.shortcuts import render, HttpResponse
 from django.http import HttpResponse, JsonResponse
-from .models import Drink
-from .serializers import DrinkSerializer
+# from .models import Drink
+# from .serializers import DrinkSerializer
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
