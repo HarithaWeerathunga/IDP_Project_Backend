@@ -43,7 +43,7 @@ def image_post_endpoint(request):
         file = request.FILES['image']
         file_name = file.name
 
-        himage = HyperSpectralImage()
+
 
         destination = 'binary-masks/'
         isExist = os.path.exists(destination)
