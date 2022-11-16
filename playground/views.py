@@ -11,6 +11,7 @@ import base64
 from django.views.decorators.csrf import csrf_exempt
 from tifffile import TiffFile, TiffWriter
 
+from playground.models import HyperSpectralImage
 
 # Create your views here.
 @csrf_exempt
@@ -41,6 +42,9 @@ def image_post_endpoint(request):
     if request.method == 'POST':
         file = request.FILES['image']
         file_name = file.name
+
+
+
         destination = 'binary-masks/'
         isExist = os.path.exists(destination)
         if not isExist:
