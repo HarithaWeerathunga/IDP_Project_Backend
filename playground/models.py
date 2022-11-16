@@ -25,12 +25,19 @@ class HyperSpectralImage(models.Model):
     bands = models.CharField(max_length=200)
     frames = models.CharField(max_length=200)
     rgb_image = models.OneToOneField(RgbImage, on_delete = models.CASCADE)
+
+    def __str__(self):
+        return self.hyperspec_image
     
 class Patient(models.Model):
     age = models.IntegerField()
+    patientID = models.CharField(max_length=20)
     gender = models.CharField(max_length=1)
     hyper_spectral_image = models.ForeignKey(HyperSpectralImage, on_delete = models.CASCADE)
     multi_modal_data = models.ForeignKey(MultimodalData, on_delete = models.CASCADE)
+
+    def __str__(self):
+        return self.patientID
 
 class Imaging(models.Model):
     acquisition_type = models.CharField(max_length=200)
