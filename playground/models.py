@@ -1,4 +1,9 @@
 from django.db import models
+import PIL.Image
+import io
+import numpy as np
+from playground.config import Config
+from tifffile import TiffFile
 
 
 class MultimodalData(models.Model):
@@ -30,20 +35,55 @@ class Patient(models.Model):
 
 class HyperSpectralImage(models.Model):
     #todo how to get the individual band from tiff file
+    # id = models.IntegerField(primary_key=True)
+    image_filename = models.CharField(max_length=200, null=True)
+    imaging_data = models.TextField(max_length=200)
+    resolution_height = models.IntegerField(null=True)
+    resolution_width = models.IntegerField(null=True)
+    resolution_depth = models.IntegerField(null=True)
 
     hyperspec_image = models.CharField(max_length=200)
-    imaging_data = models.TextField(max_length=200)
-    resolutionHeight = models.IntegerField(null=True)
-    resolutionWidth = models.IntegerField(null=True)
     bands = models.PositiveIntegerField(null=True)
     frames = models.PositiveIntegerField(null=True)
     rgb_image = models.OneToOneField(RgbImage, null=True, on_delete = models.SET_NULL)
     patient = models.OneToOneField(Patient, null=True, on_delete = models.SET_NULL)
     multi_modal_Data = models.OneToOneField(MultimodalData, null=True, on_delete = models.SET_NULL)
     actual_image = models.ImageField(blank=True, null=True, upload_to='media')
+    
+    @staticmethod
+    def _array_to_png(image_array: np.ndarray) -> io.BytesIO:
+        png_buffer = io.BytesIO()
+        image = PIL.Image.fromarray(image_array)
+        image.save(png_buffer, format='png')
+        png_buffer.seek(0)
+        return png_buffer
+
+    def get_preview_image(self) -> io.BytesIO | None:
+        actual_image_filename = Config.SPECTRAL_IMAGE_DIR / self.image_filename
+
+        match actual_image_filename.suffix.lower():
+            case '.tif':
+                with TiffFile(actual_image_filename) as tiff:
+                    if (page_0 := tiff.pages[0]).ndim == 3:
+                        return self._array_to_png(page_0.asarray())
+        return None
+
+    def get_band_image(self, n: int) -> io.BytesIO | None:
+        if n < 0 or n > self.depth:
+            print(f'{n}, {type(n)}')
+            # The requested band does not exist.
+            return None
+
+        actual_image_filename = Config.SPECTRAL_IMAGE_DIR / self.image_filename
+
+        match actual_image_filename.suffix.lower():
+            case '.tif':
+                with TiffFile(actual_image_filename) as tiff:
+                    return self._array_to_png(tiff.pages[1 + n].asarray())
+        return None
 
     def __str__(self):
-        return self.hyperspec_image
+        return self.image_filename
     
 class HsiSoftware(models.Model):
     name = models.CharField(max_length=200, null=True)

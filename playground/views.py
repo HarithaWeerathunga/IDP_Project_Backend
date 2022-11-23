@@ -10,8 +10,13 @@ from rest_framework import status
 import base64
 from django.views.decorators.csrf import csrf_exempt
 from tifffile import TiffFile, TiffWriter
+from werkzeug.utils import secure_filename
+from pathlib import Path
+import PIL.Image
+import numpy as np
 
 from playground.models import HyperSpectralImage
+from playground.config import Config
 
 # Create your views here.
 @csrf_exempt
@@ -26,7 +31,6 @@ def image_endpoint(request, name):
     elif request.method == 'DELETE':
         result = image_delete_endpoint(request, name)
         return JsonResponse({'state': True, 'message':'success', 'data': result}, safe=False)
-
 
 def image_delete_endpoint(request, name):
     destination = 'binary-masks/' + name
@@ -139,6 +143,105 @@ def load_images_from_folder(folder):
 
 
 
+
+@csrf_exempt
+def upload_spectral_image(request):
+    if request.method == 'POST' or request.method == 'GET':
+        file = request.FILES['image']
+
+        destination = Config.SPECTRAL_IMAGE_DIR
+        isExist = os.path.exists(destination)
+        if not isExist: os.makedirs(destination)
+        
+        file_name = secure_filename(file.name)
+        file_path = Path(f'{destination}\\{file_name}')
+        fn = open(file_path, 'wb+')
+        for chunk in file.chunks(): fn.write(chunk)
+        fn.close
+
+        with TiffFile(file_path) as tiff:
+            # Page 0 may be an RGB color image or a grayscale image - so the shape may be (height, width, color bands)
+            # or (height, width)... Tuple unpacking does not with this.
+            # Page 1 should be always a grayscale image with shape (height, width).
+            width, height = tiff.pages[1].shape
+            bands = len(tiff.pages) - 1
+
+            spectralImage = HyperSpectralImage()
+            spectralImage.image_filename = str(file_path.relative_to(destination))
+            spectralImage.resolution_height=height
+            spectralImage.resolution_width=width
+            spectralImage.resolution_depth=bands
+            spectralImage.save()
+
+        return JsonResponse({'state': True, 'message':'success', 'data': file_name + ' is upload to the server successfully'}, safe=False)
+
+def _generate_png_image(image_array: np.ndarray, file_name):
+    image = PIL.Image.fromarray(image_array)
+    dummy = 'generate\\{file_name}'
+    destination = Config.SPECTRAL_IMAGE_DIR
+    file_path = Path(f'{destination}\\{dummy}')
+    image.save(file_path, format='png')
+    return _png_to_base_64(dummy)
+
+def _generate_dummy_png_image(width: int, height: int):
+    image = PIL.Image.new('RGB', (width, height), (128, 128, 128))
+    dummy = 'generate\\dummy.png'
+    destination = Config.SPECTRAL_IMAGE_DIR
+    file_path = Path(f'{destination}\\{dummy}')
+    image.save(file_path, format='png')
+    return _png_to_base_64(dummy)
+
+def _png_to_base_64(file_name):
+    destination = Config.SPECTRAL_IMAGE_DIR
+    file_path = Path(f'{destination}\\{file_name}')
+    with open(file_path, "rb") as image_file:
+        image_data = base64.b64encode(image_file.read()).decode('utf-8')
+        return image_data
+
+def show_spectral_image_preview_image(request, pk: int):
+    # spectral_image = HyperSpectralImage.objects.get(pk)
+    # image_data = spectral_image.get_preview_image()
+
+    image_data = None
+    if image_data is None: image_data = _generate_dummy_png_image(1024, 1024)
+
+    return JsonResponse({'state': True, 'message':'success', 'data': 'data:image/png;base64,' + image_data}, safe=False)
+
+
+def show_spectral_image_band_image(request, pk: int, band: int):
+    # spectral_image = HyperSpectralImage.objects.get(pk)
+    # png_data = spectral_image.get_band_image(band)
+
+    image_data = None
+    if image_data is None: image_data = _generate_dummy_png_image(1024, 1024)
+
+    return JsonResponse({'state': True, 'message':'success', 'data': 'data:image/png;base64,' + image_data}, safe=False)
+
+
+
+# def _generate_a_dummy_image(width: int, height: int) -> io.BytesIO:
+#     image = PIL.Image.new('RGB', (width, height), (128, 128, 128))
+#     png_data = io.BytesIO()
+#     image.save(png_data, format='png')
+#     png_data.seek(0)
+
+#     return png_data
+    
+# def show_spectral_image_band_image(pk: int, band: int):
+#     spectral_image = HyperSpectralImage.objects.get(pk)
+#     png_data = spectral_image.get_band_image(band)
+
+#     if png_data is None: png_data = _generate_a_dummy_image(spectral_image.width, spectral_image.height)
+
+#     return send_file(png_data, 'image/png')
+
+# def show_spectral_image_preview_image(request, pk):
+    # spectral_image = HyperSpectralImage.objects.get(pk)
+    # png_data = spectral_image.get_preview_image()
+
+    # if png_data is None: png_data = _generate_a_dummy_image(spectral_image.width, spectral_image.height)
+
+    # return send_file(png_data, 'image/png')
 
 # class uploadPhoto(APIView):
 #     def get(self, request):
